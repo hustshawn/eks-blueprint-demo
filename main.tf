@@ -31,7 +31,7 @@ locals {
 
   vpc_cidr        = "10.0.0.0/16"
   azs             = slice(data.aws_availability_zones.available.names, 0, 3)
-  node_group_name = "managed-ondemand"
+  node_group_name = "${local.cluster_name}-ng"
 
   tags = {
     Blueprint  = local.name
@@ -64,6 +64,18 @@ module "eks_blueprints" {
     }
   }
 
+  fargate_profiles = {
+    # Providing compute for default namespace
+    default = {
+      fargate_profile_name = "default"
+      fargate_profile_namespaces = [
+        {
+          namespace = "fargate-only"
+      }]
+      subnet_ids = module.vpc.private_subnets
+    }
+  }
+
   tags = local.tags
 }
 
@@ -76,15 +88,27 @@ module "eks_blueprints_kubernetes_addons" {
   eks_cluster_version  = module.eks_blueprints.eks_cluster_version
 
   # EKS Managed Add-ons
-  enable_amazon_eks_vpc_cni    = true
-  enable_amazon_eks_coredns    = true
+  enable_amazon_eks_vpc_cni = true
+  amazon_eks_vpc_cni_config = {
+    addon_version     = data.aws_eks_addon_version.latest["vpc-cni"].version
+    resolve_conflicts = "OVERWRITE"
+  }
+  enable_amazon_eks_coredns = true
+  amazon_eks_coredns_config = {
+    addon_version     = data.aws_eks_addon_version.latest["coredns"].version
+    resolve_conflicts = "OVERWRITE"
+  }
   enable_amazon_eks_kube_proxy = true
-  # enable_amazon_eks_aws_ebs_csi_driver = true
+  amazon_eks_kube_proxy_config = {
+    addon_version     = data.aws_eks_addon_version.latest["kube-proxy"].version
+    resolve_conflicts = "OVERWRITE"
+  }
+  enable_amazon_eks_aws_ebs_csi_driver = false
 
   # Add-ons
   enable_aws_load_balancer_controller = true
   enable_metrics_server               = true
-  enable_aws_cloudwatch_metrics       = true
+  enable_aws_cloudwatch_metrics       = false
   enable_kubecost                     = false
   enable_gatekeeper                   = false
   enable_cluster_autoscaler           = false
@@ -119,9 +143,20 @@ data "kubectl_path_documents" "karpenter_provisioners" {
   }
 }
 
+data "aws_eks_addon_version" "latest" {
+  for_each = toset(["kube-proxy", "vpc-cni", "coredns"])
+
+  addon_name         = each.value
+  kubernetes_version = module.eks_blueprints.eks_cluster_version
+  most_recent        = true
+}
+
 resource "kubectl_manifest" "karpenter_provisioner" {
   for_each  = toset(data.kubectl_path_documents.karpenter_provisioners.documents)
   yaml_body = each.value
+  depends_on = [
+    module.eks_blueprints_kubernetes_addons
+  ]
 }
 
 
