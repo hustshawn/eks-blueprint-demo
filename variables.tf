@@ -4,3 +4,15 @@ variable "cluster_name" {
   type        = string
   default     = ""
 }
+variable "certificate_name" {
+  type        = string
+  description = "name for the certificate"
+  default     = "example"
+}
+
+
+variable "dns_domain" {
+  type        = string
+  description = "Your DNS domain"
+  default     = "example.com"
+}

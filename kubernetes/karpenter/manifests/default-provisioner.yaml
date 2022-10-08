@@ -20,6 +20,9 @@ kind: Provisioner
 metadata:
   name: default
 spec:
+  ttlSecondsUntilExpired: 3600  # 1hour, for testing the behavior
+  # consolidation:
+  #   enabled: true
   requirements:
     - key: 'kubernetes.io/arch'
       operator: In
@@ -37,7 +40,7 @@ spec:
   labels:
     type: karpenter
     provisioner: default
-  taints:
-    - key: karpenter
-      value: 'true'
-      effect: NoSchedule
+  # taints:
+  #   - key: karpenter
+  #     value: 'true'
+  #     effect: NoSchedule

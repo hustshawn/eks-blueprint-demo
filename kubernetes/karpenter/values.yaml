@@ -1,0 +1,8 @@
+# For deploy karpenter on Fargate
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - effect: NoSchedule
+    key: eks.amazonaws.com/compute-type
+    operator: Equal
+    value: fargate
