@@ -20,7 +20,9 @@ kind: Provisioner
 metadata:
   name: default
 spec:
+  # ttlSecondsUntilExpired: 604800 # expire nodes after 7 days (in seconds) = 7 * 60 * 60 * 24
   ttlSecondsUntilExpired: 3600  # 1hour, for testing the behavior
+  ttlSecondsAfterEmpty: 60 # scale down nodes after 60 seconds without workloads (excluding daemons)
   # consolidation:
   #   enabled: true
   requirements:
@@ -31,9 +33,16 @@ spec:
       operator: In
       # values: [ 'spot', 'on-demand']
       values: [ 'spot']
+    # Include general purpose instance families
+    - key: karpenter.k8s.aws/instance-family
+      operator: In
+      # values: [c5, m5, r5]
+      values: [ t2, t3 ]
+    - key: karpenter.k8s.aws/instance-size
+      operator: In
+      values: [medium, large]
   providerRef:
     name: karpenter-default      
-  ttlSecondsAfterEmpty: 60
   limits:
     resources:
       cpu: '200'
