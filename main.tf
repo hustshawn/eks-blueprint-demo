@@ -26,6 +26,19 @@ data "aws_partition" "current" {}
 data "aws_availability_zones" "available" {}
 
 
+data "aws_eks_addon_version" "latest" {
+  for_each = toset(["kube-proxy", "vpc-cni", "coredns"])
+
+  addon_name         = each.value
+  kubernetes_version = module.eks_blueprints.eks_cluster_version
+  most_recent        = true
+}
+
+data "aws_acm_certificate" "issued" {
+  domain   = var.acm_certificate_domain
+  statuses = ["ISSUED"]
+}
+
 locals {
   name = basename(path.cwd)
   # var.cluster_name is for Terratest
@@ -36,7 +49,7 @@ locals {
   azs             = slice(data.aws_availability_zones.available.names, 0, 3)
   node_group_name = "${local.cluster_name}-ng"
 
-  dns_domain      = var.dns_domain
+  dns_domain      = var.eks_cluster_domain
   certificate_dns = "test-pca.${local.dns_domain}"
 
   tags = {
@@ -92,6 +105,7 @@ module "eks_blueprints_kubernetes_addons" {
   eks_cluster_endpoint = module.eks_blueprints.eks_cluster_endpoint
   eks_oidc_provider    = module.eks_blueprints.oidc_provider
   eks_cluster_version  = module.eks_blueprints.eks_cluster_version
+  eks_cluster_domain   = var.eks_cluster_domain
 
   # EKS Managed Add-ons
   enable_amazon_eks_vpc_cni = true
@@ -138,14 +152,52 @@ module "eks_blueprints_kubernetes_addons" {
   enable_aws_privateca_issuer    = true
   aws_privateca_acmca_arn        = aws_acmpca_certificate_authority.example.arn
 
-  # enable_cert_manager_csi_driver = true
+  enable_ingress_nginx = true
+  ingress_nginx_helm_config = {
+    values = [templatefile("${path.module}/kubernetes/ingress-nginx/custom-values.yaml", {
+      hostname     = var.eks_cluster_domain
+      ssl_cert_arn = data.aws_acm_certificate.issued.arn
+    })]
+  }
   enable_external_dns = true
-  eks_cluster_domain  = local.dns_domain
+
+  enable_argocd = true
+  argocd_helm_config = {
+    values = [templatefile("${path.module}/kubernetes/argocd/values.yaml", {
+      hostname = "argocd.${var.eks_cluster_domain}"
+    })]
+
+    set_values = [
+      {
+        name  = "configs.params.server.insecure"
+        value = true
+      },
+      {
+        name  = "server.extraArgs[0]"
+        value = "--insecure"
+      }
+    ]
+  }
+  argocd_applications = {
+    workloads = {
+      path     = "envs/dev"
+      repo_url = "https://github.com/aws-samples/eks-blueprints-workloads.git"
+      values = {
+        spec = {
+          ingress = {
+            host = var.eks_cluster_domain
+          }
+        }
+      }
+    }
+  }
 
   tags = local.tags
 }
 
-
+#-------------------------------
+# Karpenter manifests
+#-------------------------------
 data "kubectl_path_documents" "karpenter_provisioners" {
   pattern = "${path.module}/kubernetes/karpenter/manifests/*"
   vars = {
@@ -154,14 +206,6 @@ data "kubectl_path_documents" "karpenter_provisioners" {
     eks-cluster-id          = local.name
     eks-vpc_name            = local.name
   }
-}
-
-data "aws_eks_addon_version" "latest" {
-  for_each = toset(["kube-proxy", "vpc-cni", "coredns"])
-
-  addon_name         = each.value
-  kubernetes_version = module.eks_blueprints.eks_cluster_version
-  most_recent        = true
 }
 
 resource "kubectl_manifest" "karpenter_provisioner" {
@@ -187,7 +231,7 @@ resource "aws_acmpca_certificate_authority" "example" {
     signing_algorithm = "SHA512WITHRSA"
 
     subject {
-      common_name = local.dns_domain
+      common_name = var.eks_cluster_domain
     }
   }
 
@@ -282,8 +326,10 @@ resource "kubectl_manifest" "example_pca_certificate" {
     kubectl_manifest.cluster_pca_issuer,
   ]
 }
+
+
 #---------------------------------------------------------------
-# Supporting Resources
+# Supporting Resources - VPC
 #---------------------------------------------------------------
 
 module "vpc" {

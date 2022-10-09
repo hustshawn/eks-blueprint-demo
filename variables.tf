@@ -10,9 +10,13 @@ variable "certificate_name" {
   default     = "example"
 }
 
-
-variable "dns_domain" {
+variable "eks_cluster_domain" {
   type        = string
   description = "Your DNS domain"
   default     = "example.com"
+}
+
+variable "acm_certificate_domain" {
+  type        = string
+  description = "ACME cert domain"
 }

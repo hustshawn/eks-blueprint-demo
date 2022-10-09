@@ -1,0 +1,24 @@
+server:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+  extraArgs: 
+  - --insecure=true
+
+  ingress:
+    # -- Enable an ingress resource for the Argo CD server
+    enabled: true
+    hosts:
+      - ${hostname}
+    ingressClassName: nginx
+
+redis-ha:
+  enabled: true
+
+controller:
+  enableStatefulSet: true
+
+repoServer:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
