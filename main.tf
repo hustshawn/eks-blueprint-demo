@@ -139,7 +139,10 @@ module "eks_blueprints_kubernetes_addons" {
   # }
   enable_aws_node_termination_handler = true
 
-  enable_cert_manager = true
+  enable_cert_manager                      = true
+  cert_manager_domain_names                = [var.eks_cluster_domain]
+  cert_manager_install_letsencrypt_issuers = true
+  cert_manager_letsencrypt_email           = var.cert_manager_letsencrypt_email
   cert_manager_helm_config = {
     set_values = [
       {

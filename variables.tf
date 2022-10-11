@@ -20,3 +20,9 @@ variable "acm_certificate_domain" {
   type        = string
   description = "ACME cert domain"
 }
+
+variable "cert_manager_letsencrypt_email" {
+  type        = string
+  description = "The email used for letsencrypt"
+  default     = "example@gmail.com"
+}

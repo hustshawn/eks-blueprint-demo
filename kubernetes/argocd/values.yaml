@@ -8,6 +8,12 @@ server:
   ingress:
     # -- Enable an ingress resource for the Argo CD server
     enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: cert-manager-letsencrypt-production-route53
+    tls:
+    - secretName: argocd-tls-certificate
+      hosts:
+        - ${hostname}
     hosts:
       - ${hostname}
     ingressClassName: nginx
