@@ -15,8 +15,3 @@ controller:
 
       # External DNS Annotations
       external-dns.alpha.kubernetes.io/hostname: ${hostname}
-
-    # Only when ssl terminate at elb
-    # targetPorts:
-    #   http: http
-    #   https: http
