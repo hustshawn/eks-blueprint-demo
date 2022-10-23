@@ -63,7 +63,7 @@ locals {
 #---------------------------------------------------------------
 
 module "eks_blueprints" {
-  source = "github.com/aws-ia/terraform-aws-eks-blueprints?ref=v4.10.0"
+  source = "github.com/aws-ia/terraform-aws-eks-blueprints?ref=v4.13.0"
 
   cluster_name    = local.cluster_name
   cluster_version = "1.23"
@@ -99,7 +99,7 @@ module "eks_blueprints" {
 }
 
 module "eks_blueprints_kubernetes_addons" {
-  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.10.0"
+  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.13.0"
 
   eks_cluster_id       = module.eks_blueprints.eks_cluster_id
   eks_cluster_endpoint = module.eks_blueprints.eks_cluster_endpoint
@@ -134,11 +134,9 @@ module "eks_blueprints_kubernetes_addons" {
   enable_cluster_autoscaler           = false
 
   enable_karpenter = true
-  # karpenter_helm_config = {
-
-  # }
   enable_aws_node_termination_handler = true
 
+  # cert-manager configs
   enable_cert_manager                      = true
   cert_manager_domain_names                = [var.eks_cluster_domain]
   cert_manager_install_letsencrypt_issuers = true
@@ -151,10 +149,11 @@ module "eks_blueprints_kubernetes_addons" {
       },
     ]
   }
-  enable_cert_manager_csi_driver = true
-  enable_aws_privateca_issuer    = true
-  aws_privateca_acmca_arn        = aws_acmpca_certificate_authority.example.arn
 
+  # external-dns
+  enable_external_dns = true
+
+  # nginx-ingress controller
   enable_ingress_nginx = true
   ingress_nginx_helm_config = {
     values = [templatefile("${path.module}/kubernetes/ingress-nginx/custom-values.yaml", {
@@ -162,7 +161,9 @@ module "eks_blueprints_kubernetes_addons" {
       ssl_cert_arn = data.aws_acm_certificate.issued.arn
     })]
   }
-  enable_external_dns = true
+
+  enable_aws_privateca_issuer    = true
+  aws_privateca_acmca_arn        = aws_acmpca_certificate_authority.example.arn
 
   enable_argocd = true
   argocd_helm_config = {
@@ -171,10 +172,10 @@ module "eks_blueprints_kubernetes_addons" {
     })]
 
     set_values = [
-      {
-        name  = "configs.params.server.insecure"
-        value = true
-      },
+      # {
+      #   name  = "configs.params.server.insecure"
+      #   value = true
+      # },
       {
         name  = "server.extraArgs[0]"
         value = "--insecure"
